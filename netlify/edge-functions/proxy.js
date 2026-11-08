@@ -1,4 +1,15 @@
 export default async (request, context) => {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "*",
+      },
+    });
+  }
+
   const url = new URL(request.url);
   const targetUrl = "https://openrouter.ai" + url.pathname + url.search;
 
@@ -12,22 +23,21 @@ export default async (request, context) => {
   cleanHeaders.set("HTTP-Referer", "https://chatboxai.app");
   cleanHeaders.set("X-Title", "Chatbox");
 
+  // 先把请求体完整读出来，彻底防止 Edge Function 转发 ReadableStream 时崩溃报错！
+  let bodyData = undefined;
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    bodyData = await request.text();
+  }
+
   const res = await fetch(targetUrl, {
     method: request.method,
     headers: cleanHeaders,
-    body: request.method !== "GET" && request.method !== "HEAD" ? request.body : undefined,
-    redirect: "manual",
+    body: bodyData,
   });
 
   const resHeaders = new Headers();
   resHeaders.set("Content-Type", res.headers.get("content-type") || "application/json");
   resHeaders.set("Access-Control-Allow-Origin", "*");
-  resHeaders.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  resHeaders.set("Access-Control-Allow-Headers", "*");
-
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: resHeaders });
-  }
 
   return new Response(res.body, {
     status: res.status,
